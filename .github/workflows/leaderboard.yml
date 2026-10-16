@@ -1,0 +1,69 @@
+name: leaderboard
+
+# After a submission merges, score it and update LEADERBOARD.md.
+# Fully trusted context: this workflow only runs on pushes to main.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "submissions/**"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: leaderboard
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      SCORE_PORT: 8080
+      SCORE_CONNS: 5000
+      SCORE_SECONDS: 30
+      SCORE_THREADS: 2
+      PIN_SERVER: 0-1
+      PIN_LOADGEN: 2-3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: kernel tuning
+        run: |
+          sudo sysctl -w net.ipv4.tcp_tw_reuse=1 || true
+          sudo sysctl -w net.core.somaxconn=65535 || true
+
+      - name: score newly merged submissions
+        run: |
+          BEFORE="${{ github.event.before }}"
+          if git cat-file -e "$BEFORE" 2>/dev/null; then
+            DIRS=$(git diff --name-only "$BEFORE" HEAD -- submissions/ | cut -d/ -f2 | sort -u | grep -v '^_template$' || true)
+          else
+            DIRS=""
+          fi
+          if [ -z "$DIRS" ]; then
+            DIRS=$(ls submissions 2>/dev/null | grep -v '^_template$' || true)
+          fi
+          mkdir -p results
+          for d in $DIRS; do
+            if [ -d "submissions/$d" ]; then
+              echo "::group::scoring submissions/$d"
+              bash scoring/run_score.sh "submissions/$d" "results/$(basename "$d").json" || echo "score script failed for $d"
+              echo "::endgroup::"
+            fi
+          done
+
+      - name: rebuild the leaderboard
+        run: |
+          python3 .github/scripts/update_leaderboard.py
+
+      - name: commit if changed
+        run: |
+          git config user.name "fizzbuzz-bot"
+          git config user.email "actions@github.com"
+          git add LEADERBOARD.md
+          git diff --cached --quiet || git commit -m "🥤 update leaderboard [skip ci]"
+          git push

@@ -1,0 +1,77 @@
+name: score
+
+# Scores pull requests that touch submissions.
+# pull_request_target on purpose: the workflow definition is always taken
+# from main (never from the PR), while we explicitly check out the PR head
+# to build and bench the submission code.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "submissions/**"
+
+permissions:
+  pull-requests: write
+  contents: read
+
+concurrency:
+  group: score-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      SCORE_PORT: 8080
+      SCORE_CONNS: 5000
+      SCORE_SECONDS: 30
+      SCORE_THREADS: 2
+      PIN_SERVER: 0-1
+      PIN_LOADGEN: 2-3
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - name: check out the PR head (untrusted code, no secrets)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: kernel tuning
+        run: |
+          sudo sysctl -w net.ipv4.tcp_tw_reuse=1 || true
+          sudo sysctl -w net.core.somaxconn=65535 || true
+
+      - name: score changed submissions
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          git fetch origin "$BASE_SHA" --depth=1 2>/dev/null || true
+          if git cat-file -e "$BASE_SHA" 2>/dev/null; then
+            DIRS=$(git diff --name-only "$BASE_SHA" HEAD -- submissions/ | cut -d/ -f2 | sort -u | grep -v '^_template$' || true)
+          else
+            DIRS=""
+          fi
+          if [ -z "$DIRS" ]; then
+            DIRS=$(ls submissions 2>/dev/null | grep -v '^_template$' || true)
+          fi
+          mkdir -p results
+          for d in $DIRS; do
+            if [ -d "submissions/$d" ]; then
+              echo "::group::scoring submissions/$d"
+              bash scoring/run_score.sh "submissions/$d" "results/$(basename "$d").json" || echo "score script failed for $d"
+              echo "::endgroup::"
+            fi
+          done
+          ls -la results/ || true
+
+      - name: comment the score on the PR
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 .github/scripts/pr_comment.py
+
+      - name: upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: score-results
+          path: results/

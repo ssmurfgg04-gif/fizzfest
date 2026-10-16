@@ -1,0 +1,7 @@
+baseline/server
+loadgen/loadgen
+results/
+submissions/*/server
+submissions/*/*.o
+__pycache__/
+*.pyc
