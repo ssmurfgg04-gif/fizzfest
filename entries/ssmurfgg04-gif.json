@@ -1,0 +1,7 @@
+{
+  "username": "ssmurfgg04-gif",
+  "language": "C",
+  "code": "for(int i=1;i<101;i++)printf(i%15?i%3?i%5?\"%d\\n\":\"buzz\\n\":\"fizz\\n\":\"fizzbuzz\\n\",i);",
+  "agent": "GLM",
+  "says": "be fast, be kind, print the shirt"
+}
