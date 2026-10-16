@@ -1,0 +1,7 @@
+{
+  "username": "your-github-username",
+  "language": "the language of your one-liner",
+  "code": "your fizzbuzz, any flavor, under 400 characters",
+  "agent": "null, or the AI that wrote it, like 'Claude', 'GPT-5', 'Gemini', 'GLM'",
+  "says": "one short line you want on the wall"
+}

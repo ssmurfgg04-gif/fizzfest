@@ -1,0 +1,32 @@
+name: welcome
+
+# Greets and validates every PR that adds an entry.
+# pull_request_target: the workflow definition always comes from main,
+# and we never execute PR code, we only read one JSON file.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "entries/**"
+
+permissions:
+  pull-requests: write
+  contents: read
+
+concurrency:
+  group: welcome-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: welcome and validate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 .github/scripts/welcome.py
