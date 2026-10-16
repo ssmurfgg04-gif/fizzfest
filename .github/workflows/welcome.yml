@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: check out main (trusted script, never PR code)
+        uses: actions/checkout@v4
       - name: welcome and validate
         env:
           GITHUB_TOKEN: ${{ github.token }}
