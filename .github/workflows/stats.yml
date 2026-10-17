@@ -3,6 +3,7 @@ name: stats
 # After an entry merges: recount the party, update stats.json (feeds the
 # README badge), commit if anything changed.
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
